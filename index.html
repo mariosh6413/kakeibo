@@ -474,7 +474,7 @@ async function doAIClassify() {
   try {
     const catList = CATS[formType].map(c=>c.id).join('、');
     const prompt = `以下の取引を最も適切なカテゴリに分類してください。\n取引内容: ${desc}\n金額: ¥${amt}\n種別: ${formType==='expense'?'支出':'収入'}\n選択可能なカテゴリ: ${catList}\nカテゴリ名のみを回答してください。`;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,{
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
@@ -559,7 +559,7 @@ async function runAnalysis() {
     const catSummary=Object.entries(byCat).sort(([,a],[,b])=>b-a).map(([k,v])=>`${k}: ¥${v.toLocaleString()}`).join('\n');
     const settings=DB.settings;
     const prompt=`あなたは家計管理の専門家AIです。${analysisYear}年${analysisMonth}月の家計データを分析してわかりやすい日本語でアドバイスをください。\n\n収入合計: ¥${totalInc.toLocaleString()}\n支出合計: ¥${totalExp.toLocaleString()}\n収支差: ¥${(totalInc-totalExp).toLocaleString()}\n${settings.budget>0?`月次予算: ¥${Number(settings.budget).toLocaleString()}（使用率${Math.round(totalExp/settings.budget*100)}%）`:''}\n\nカテゴリ別支出:\n${catSummary}\n\n以下のJSON形式のみで回答してください:\n{"summary":"総評(2-3文)","advice":["ア1","ア2","ア3"],"tips":["コツ1","コツ2","コツ3"]}`;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,{
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
