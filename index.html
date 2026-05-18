@@ -218,7 +218,7 @@ input,textarea{font-family:inherit}
     <div class="settings-card">
       <button class="danger-btn" onclick="clearAllData()">取引データをすべて削除</button>
     </div>
-    <div class="app-info">AI家計簿 v2.0<br>Powered by Claude API</div>
+    <div class="app-info">AI家計簿 v2.0<br>Powered by Gemini API</div>
   </div>
 </div>
 
@@ -474,14 +474,14 @@ async function doAIClassify() {
   try {
     const catList = CATS[formType].map(c=>c.id).join('、');
     const prompt = `以下の取引を最も適切なカテゴリに分類してください。\n取引内容: ${desc}\n金額: ¥${amt}\n種別: ${formType==='expense'?'支出':'収入'}\n選択可能なカテゴリ: ${catList}\nカテゴリ名のみを回答してください。`;
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:20,messages:[{role:'user',content:prompt}]})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
     if(!res.ok) throw new Error('API error');
     const data = await res.json();
-    const result = data.content[0]?.text?.trim();
+    const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     const valid = CATS[formType].map(c=>c.id);
     if(valid.includes(result)){
       formCat=result; renderCatGrid();
@@ -559,14 +559,14 @@ async function runAnalysis() {
     const catSummary=Object.entries(byCat).sort(([,a],[,b])=>b-a).map(([k,v])=>`${k}: ¥${v.toLocaleString()}`).join('\n');
     const settings=DB.settings;
     const prompt=`あなたは家計管理の専門家AIです。${analysisYear}年${analysisMonth}月の家計データを分析してわかりやすい日本語でアドバイスをください。\n\n収入合計: ¥${totalInc.toLocaleString()}\n支出合計: ¥${totalExp.toLocaleString()}\n収支差: ¥${(totalInc-totalExp).toLocaleString()}\n${settings.budget>0?`月次予算: ¥${Number(settings.budget).toLocaleString()}（使用率${Math.round(totalExp/settings.budget*100)}%）`:''}\n\nカテゴリ別支出:\n${catSummary}\n\n以下のJSON形式のみで回答してください:\n{"summary":"総評(2-3文)","advice":["ア1","ア2","ア3"],"tips":["コツ1","コツ2","コツ3"]}`;
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[{role:'user',content:prompt}]})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
     if(!res.ok) throw new Error('API error');
     const data=await res.json();
-    const text=data.content[0]?.text?.trim()||'';
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'';
     const match=text.match(/\{[\s\S]*\}/);
     if(!match) throw new Error('parse error');
     const parsed=JSON.parse(match[0]);
@@ -619,14 +619,14 @@ function renderSettings() {
   const aiEl = document.getElementById('settings-ai-section');
   // APIキー入力 UI
   aiEl.innerHTML=`
-    <div class="field-label">Claude APIキー</div>
+    <div class="field-label">Gemini APIキー</div>
     <div class="apikey-row">
-      <input class="apikey-input" id="apikey-input" type="password" placeholder="sk-ant-..." value="${s.apiKey||''}" autocomplete="off">
+      <input class="apikey-input" id="apikey-input" type="password" placeholder="AIza..." value="${s.apiKey||''}" autocomplete="off">
       <button class="eye-btn" onclick="toggleApiKeyVisibility()">👁️</button>
     </div>
     <div class="hint-text">
-      <a href="https://console.anthropic.com" target="_blank" style="color:#4F46E5">console.anthropic.com</a> でAPIキーを発行できます。<br>
-      APIキーを登録するとAI自動分類・月次分析が使えます。<br>
+      <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#4F46E5">aistudio.google.com/apikey</a> で無料のAPIキーを発行できます。<br>
+      Googleアカウントがあれば無料で使えます。<br>
       登録しなくても家計簿として使えます。
     </div>`;
   if(s.budget>0) {
