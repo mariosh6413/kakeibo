@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI家計簿">
+<meta name="theme-color" content="#4F46E5">
+<title>AI家計簿</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;background:#F8F9FE;color:#2C3E50;max-width:430px;margin:0 auto;min-height:100dvh;overflow-x:hidden}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+input,textarea{font-family:inherit}
+
+/* ページ切り替え */
+.page{display:none;padding-bottom:80px;min-height:100dvh}
+.page.active{display:block}
+
+/* グラデヘッダー */
+.grad{background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;padding:env(safe-area-inset-top,48px) 16px 20px}
+
+/* 月選択 */
+.month-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:14px}
+.month-nav button{color:#fff;font-size:28px;padding:4px 10px;opacity:.85}
+.month-nav span{font-size:18px;font-weight:700;min-width:130px;text-align:center}
+
+/* サマリーカード */
+.summary-row{display:flex;gap:8px;margin-bottom:12px}
+.summary-card{flex:1;background:rgba(255,255,255,.15);border-radius:12px;padding:10px;text-align:center}
+.summary-card .lbl{font-size:11px;opacity:.8;margin-bottom:4px}
+.summary-card .val{font-size:15px;font-weight:700}
+.income-val{color:#A7F3D0}
+.expense-val{color:#FCA5A5}
+
+/* 予算バー */
+.budget-bar-wrap{margin-top:4px}
+.budget-bar-label{font-size:11px;opacity:.75;margin-bottom:5px}
+.budget-bar{height:6px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden}
+.budget-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* 取引リスト */
+.tx-list{padding:14px 14px 0}
+.tx-item{display:flex;align-items:center;background:#fff;border-radius:14px;padding:13px;margin-bottom:8px;box-shadow:0 1px 5px rgba(0,0,0,.06);gap:12px}
+.tx-icon{width:42px;height:42px;border-radius:21px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.tx-info{flex:1;min-width:0}
+.tx-desc{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:11px;color:#95A5A6;margin-top:2px}
+.tx-amount{font-size:15px;font-weight:700;white-space:nowrap}
+.tx-del{color:#BDC3C7;font-size:18px;padding:4px 6px;flex-shrink:0}
+.empty{text-align:center;padding:60px 20px;color:#95A5A6}
+.empty-icon{font-size:48px;margin-bottom:12px}
+
+/* FAB */
+.fab{position:fixed;bottom:80px;right:calc(50% - 215px + 16px);width:58px;height:58px;border-radius:29px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(79,70,229,.45);z-index:50;transition:transform .15s}
+.fab:active{transform:scale(.93)}
+@media(max-width:430px){.fab{right:16px}}
+
+/* ボトムナビ */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;display:flex;border-top:1px solid #F0F0F0;box-shadow:0 -2px 12px rgba(0,0,0,.07);z-index:100;padding-bottom:env(safe-area-inset-bottom,0)}
+.nav-btn{flex:1;padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;color:#95A5A6;font-size:10px;font-weight:600;transition:color .15s}
+.nav-btn.active{color:#4F46E5}
+.nav-icon{font-size:22px}
+
+/* モーダル */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:flex-end}
+.modal-bg.open{display:flex}
+.modal{background:#F8F9FE;border-radius:24px 24px 0 0;width:100%;max-width:430px;margin:0 auto;max-height:92dvh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0))}
+.modal-handle{width:40px;height:4px;background:#E0E0E0;border-radius:2px;margin:0 auto 18px}
+
+/* フォーム部品 */
+.section{margin-bottom:18px}
+.field-label{font-size:12px;font-weight:700;color:#95A5A6;text-transform:uppercase;margin-bottom:7px;letter-spacing:.5px}
+.type-toggle{display:flex;background:#ECF0F1;border-radius:12px;padding:4px;gap:4px}
+.type-btn{flex:1;padding:9px;border-radius:9px;font-size:14px;font-weight:700;color:#7F8C8D;transition:all .2s}
+.type-btn.active-expense{background:#EF4444;color:#fff}
+.type-btn.active-income{background:#10B981;color:#fff}
+.amount-row{display:flex;align-items:center;background:#fff;border-radius:12px;padding:0 14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.yen{font-size:22px;font-weight:700;margin-right:4px;color:#4F46E5}
+.amount-input{flex:1;font-size:30px;font-weight:700;padding:12px 0;border:none;outline:none;background:transparent;color:#2C3E50}
+.desc-row{display:flex;gap:8px}
+.input{background:#fff;border-radius:12px;padding:13px;font-size:14px;color:#2C3E50;border:none;outline:none;width:100%;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.input::placeholder{color:#BDC3C7}
+.ai-btn{background:#4F46E5;color:#fff;border-radius:12px;padding:0 13px;font-size:13px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:4px;flex-shrink:0}
+.ai-btn:disabled{background:#BDC3C7}
+.ai-hint{font-size:11px;color:#95A5A6;margin-top:5px}
+.ai-ok{font-size:11px;color:#4F46E5;font-weight:600;margin-top:5px}
+.cat-grid{display:flex;flex-wrap:wrap;gap:7px}
+.cat-chip{display:flex;align-items:center;gap:4px;background:#fff;border-radius:20px;padding:7px 11px;border:1.5px solid #ECF0F1;font-size:12px;color:#5D6D7E;font-weight:500;transition:all .2s;cursor:pointer}
+.cat-chip.selected{color:#fff;font-weight:700;border-color:transparent}
+.textarea{background:#fff;border-radius:12px;padding:13px;font-size:14px;color:#2C3E50;border:none;outline:none;width:100%;min-height:72px;resize:none;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.save-btn{width:100%;padding:15px;border-radius:14px;font-size:16px;font-weight:700;color:#fff;margin-top:8px}
+
+/* 分析ページ */
+.analyze-btn{width:100%;background:#fff;color:#4F46E5;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:0}
+.no-login-box{background:rgba(255,255,255,.15);border-radius:14px;padding:14px;text-align:center}
+.no-login-box p{font-size:13px;line-height:1.7;margin-bottom:4px}
+.no-login-box small{font-size:11px;opacity:.75}
+.analysis-content{padding:14px}
+.card{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card-title{font-size:14px;font-weight:700;margin-bottom:12px}
+.summary-text{font-size:13px;color:#5D6D7E;line-height:1.7}
+.cat-bar-row{display:flex;align-items:center;margin-bottom:11px;gap:8px}
+.rank{font-size:12px;font-weight:700;color:#95A5A6;width:16px}
+.cat-bar-info{flex:1}
+.cat-bar-labels{display:flex;justify-content:space-between;margin-bottom:4px}
+.cat-bar-name{font-size:13px;font-weight:600}
+.cat-bar-amt{font-size:13px;font-weight:700;color:#E74C3C}
+.bar-track{height:6px;background:#ECF0F1;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.cat-pct{font-size:11px;color:#95A5A6;margin-top:2px}
+.advice-item{display:flex;gap:6px;margin-bottom:8px;font-size:13px;color:#5D6D7E;line-height:1.6}
+.advice-dot{color:#4F46E5;font-weight:700;flex-shrink:0}
+.tip-item{display:flex;gap:8px;margin-bottom:9px;align-items:flex-start}
+.tip-num{background:#10B981;color:#fff;border-radius:10px;width:20px;height:20px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.tip-text{font-size:13px;color:#166534;line-height:1.6}
+.placeholder{text-align:center;padding:60px 30px;color:#95A5A6}
+.placeholder-icon{font-size:56px;margin-bottom:14px}
+.placeholder-text{font-size:14px;line-height:1.7}
+
+/* 設定ページ */
+.settings-content{padding:14px}
+.section-title{font-size:14px;font-weight:700;color:#2C3E50;margin-bottom:10px}
+.settings-card{background:#fff;border-radius:16px;padding:16px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.logged-in-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.status-dot{width:8px;height:8px;border-radius:4px;background:#10B981}
+.logged-in-text{font-size:14px;font-weight:700}
+.logged-in-sub{font-size:12px;color:#27AE60;margin-bottom:12px}
+.not-logged-text{font-size:13px;color:#7F8C8D;line-height:1.7;margin-bottom:14px}
+.login-btn-grad{width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-size:14px;font-weight:700;margin-bottom:8px}
+.login-note{font-size:11px;color:#95A5A6;text-align:center}
+.logout-btn{width:100%;padding:12px;border-radius:10px;background:#FFF5F5;color:#E74C3C;font-size:13px;font-weight:600;border:1.5px solid #FCA5A5}
+.apikey-row{display:flex;gap:8px;margin-bottom:6px}
+.apikey-input{flex:1;background:#F8F9FA;border-radius:10px;padding:12px;font-size:13px;color:#2C3E50;border:1px solid #ECF0F1;font-family:monospace}
+.eye-btn{background:#F8F9FA;border-radius:10px;padding:10px;border:1px solid #ECF0F1;font-size:16px}
+.hint-text{font-size:11px;color:#95A5A6;line-height:1.6;margin-top:6px}
+.budget-row{display:flex;align-items:center;gap:4px}
+.budget-yen{font-size:16px;font-weight:700;color:#2C3E50}
+.budget-input{flex:1;background:#F8F9FA;border-radius:10px;padding:12px;font-size:14px;color:#2C3E50;border:1px solid #ECF0F1}
+.budget-preview{font-size:12px;color:#4F46E5;font-weight:600;margin-top:7px}
+.save-settings-btn{width:100%;padding:15px;border-radius:14px;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(135deg,#4F46E5,#7C3AED);margin-bottom:20px}
+.save-settings-btn.saved{background:linear-gradient(135deg,#10B981,#059669)}
+.danger-btn{width:100%;padding:13px;border-radius:10px;background:#FFF5F5;color:#E74C3C;font-size:13px;font-weight:600;border:1.5px solid #FCA5A5}
+.app-info{text-align:center;margin-top:20px;color:#BDC3C7;font-size:12px;line-height:1.8}
+
+/* ローダー */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* トースト */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#2C3E50;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ホームページ -->
+<div id="page-home" class="page active">
+  <div class="grad">
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <span id="month-label"></span>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="summary-row">
+      <div class="summary-card"><div class="lbl">収入</div><div class="val income-val" id="total-income">¥0</div></div>
+      <div class="summary-card"><div class="lbl">支出</div><div class="val expense-val" id="total-expense">¥0</div></div>
+      <div class="summary-card"><div class="lbl">残高</div><div class="val" id="total-balance" style="color:#fff">¥0</div></div>
+    </div>
+    <div class="budget-bar-wrap" id="budget-section" style="display:none">
+      <div class="budget-bar-label" id="budget-label"></div>
+      <div class="budget-bar"><div class="budget-fill" id="budget-fill"></div></div>
+    </div>
+  </div>
+  <div class="tx-list" id="tx-list"></div>
+  <button class="fab" onclick="openAdd()">＋</button>
+</div>
+
+<!-- AI分析ページ -->
+<div id="page-analysis" class="page">
+  <div class="grad">
+    <div class="month-nav">
+      <button onclick="changeAnalysisMonth(-1)">‹</button>
+      <span id="analysis-month-label"></span>
+      <button onclick="changeAnalysisMonth(1)">›</button>
+    </div>
+    <div id="analysis-header-content"></div>
+  </div>
+  <div id="analysis-body"></div>
+</div>
+
+<!-- 設定ページ -->
+<div id="page-settings" class="page">
+  <div class="grad" style="padding-bottom:24px">
+    <div style="font-size:22px;font-weight:800">⚙️ 設定</div>
+  </div>
+  <div class="settings-content">
+    <!-- Claude AI -->
+    <div class="section-title" style="margin-top:14px">🤖 Claude AI</div>
+    <div class="settings-card">
+      <div id="settings-ai-section"></div>
+    </div>
+    <!-- 月次予算 -->
+    <div class="section-title">💰 月次予算</div>
+    <div class="settings-card">
+      <div class="field-label">月の予算（円）</div>
+      <div class="budget-row">
+        <span class="budget-yen">¥</span>
+        <input class="budget-input" id="budget-input" type="number" placeholder="例: 200000" oninput="updateBudgetPreview()">
+      </div>
+      <div class="budget-preview" id="budget-preview" style="display:none"></div>
+    </div>
+    <button class="save-settings-btn" id="save-settings-btn" onclick="saveSettings()">設定を保存</button>
+    <!-- データ管理 -->
+    <div class="section-title" style="color:#E74C3C">⚠️ データ管理</div>
+    <div class="settings-card">
+      <button class="danger-btn" onclick="clearAllData()">取引データをすべて削除</button>
+    </div>
+    <div class="app-info">AI家計簿 v2.0<br>Powered by Claude API</div>
+  </div>
+</div>
+
+<!-- ボトムナビ -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-home" onclick="showPage('home')"><span class="nav-icon">🏠</span>ホーム</button>
+  <button class="nav-btn" id="nav-analysis" onclick="showPage('analysis')"><span class="nav-icon">📊</span>AI分析</button>
+  <button class="nav-btn" id="nav-settings" onclick="showPage('settings')"><span class="nav-icon">⚙️</span>設定</button>
+</nav>
+
+<!-- 取引追加モーダル -->
+<div class="modal-bg" id="add-modal" onclick="handleModalBgClick(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="type-toggle" style="margin-bottom:18px">
+      <button class="type-btn active-expense" id="type-expense" onclick="setType('expense')">支出</button>
+      <button class="type-btn" id="type-income" onclick="setType('income')">収入</button>
+    </div>
+    <div class="section">
+      <div class="field-label">金額</div>
+      <div class="amount-row"><span class="yen">¥</span><input class="amount-input" id="amount-input" type="number" placeholder="0" inputmode="numeric"></div>
+    </div>
+    <div class="section">
+      <div class="field-label">内容</div>
+      <div class="desc-row">
+        <input class="input" id="desc-input" type="text" placeholder="例: コンビニ、スーパー、給与...">
+        <button class="ai-btn" id="ai-classify-btn" onclick="doAIClassify()">✨AI</button>
+      </div>
+      <div id="ai-classify-hint" class="ai-hint"></div>
+    </div>
+    <div class="section">
+      <div class="field-label">カテゴリ</div>
+      <div class="cat-grid" id="cat-grid"></div>
+    </div>
+    <div class="section">
+      <div class="field-label">日付</div>
+      <input class="input" id="date-input" type="date">
+    </div>
+    <div class="section">
+      <div class="field-label">メモ（任意）</div>
+      <textarea class="textarea" id="memo-input" placeholder="メモを入力..."></textarea>
+    </div>
+    <button class="save-btn" id="save-tx-btn" onclick="saveTx()">保存する</button>
+  </div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================
+// データ
+// ============================
+const CATS = {
+  expense: [
+    {id:'食費',icon:'🛒',color:'#FF6B6B'},
+    {id:'外食',icon:'🍜',color:'#FF8E53'},
+    {id:'交通費',icon:'🚃',color:'#4ECDC4'},
+    {id:'日用品',icon:'🧴',color:'#45B7D1'},
+    {id:'娯楽',icon:'🎮',color:'#96CEB4'},
+    {id:'医療・健康',icon:'💊',color:'#88D8B0'},
+    {id:'衣服・美容',icon:'👗',color:'#FFEAA7'},
+    {id:'教育',icon:'📚',color:'#DDA0DD'},
+    {id:'通信費',icon:'📱',color:'#98D8C8'},
+    {id:'光熱費',icon:'💡',color:'#F7DC6F'},
+    {id:'住居費',icon:'🏠',color:'#A9CCE3'},
+    {id:'保険',icon:'🛡️',color:'#A8D8EA'},
+    {id:'その他',icon:'📦',color:'#BDC3C7'},
+  ],
+  income: [
+    {id:'給与',icon:'💰',color:'#2ECC71'},
+    {id:'副収入',icon:'📈',color:'#27AE60'},
+    {id:'その他収入',icon:'🎁',color:'#1ABC9C'},
+  ]
+};
+
+const CHART_COLORS = ['#FF6B6B','#FF8E53','#4ECDC4','#45B7D1','#96CEB4','#88D8B0','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F'];
+
+function getCat(id) {
+  return [...CATS.expense,...CATS.income].find(c=>c.id===id) || {id:'その他',icon:'📦',color:'#BDC3C7'};
+}
+
+const DB = {
+  get txs() { try{return JSON.parse(localStorage.getItem('kakeibo_txs')||'[]')}catch{return[]} },
+  set txs(v) { localStorage.setItem('kakeibo_txs',JSON.stringify(v)) },
+  get settings() { try{return JSON.parse(localStorage.getItem('kakeibo_settings')||'{}')}catch{return{}} },
+  set settings(v) { localStorage.setItem('kakeibo_settings',JSON.stringify(v)) },
+};
+
+// ============================
+// 状態
+// ============================
+let curYear = new Date().getFullYear();
+let curMonth = new Date().getMonth()+1;
+let analysisYear = new Date().getFullYear();
+let analysisMonth = new Date().getMonth()+1;
+let formType = 'expense';
+let formCat = 'その他';
+let analysisResult = null;
+
+// ============================
+// ユーティリティ
+// ============================
+function fmt(n) { return '¥'+Number(n).toLocaleString('ja-JP') }
+function fmtDate(iso) { const d=new Date(iso); return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}` }
+function genId() { return Date.now().toString(36)+Math.random().toString(36).slice(2) }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ============================
+// ページ切り替え
+// ============================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  if(name==='home') renderHome();
+  if(name==='analysis') renderAnalysis();
+  if(name==='settings') renderSettings();
+}
+
+// ============================
+// ホーム
+// ============================
+function changeMonth(d) {
+  curMonth += d;
+  if(curMonth>12){curMonth=1;curYear++}
+  if(curMonth<1){curMonth=12;curYear--}
+  renderHome();
+}
+
+function renderHome() {
+  document.getElementById('month-label').textContent = `${curYear}年${curMonth}月`;
+  const txs = DB.txs.filter(t=>{const d=new Date(t.date);return d.getFullYear()===curYear&&d.getMonth()+1===curMonth});
+  const inc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const bal = inc-exp;
+  document.getElementById('total-income').textContent = fmt(inc);
+  document.getElementById('total-expense').textContent = fmt(exp);
+  const balEl = document.getElementById('total-balance');
+  balEl.textContent = fmt(Math.abs(bal));
+  balEl.style.color = bal>=0 ? '#A7F3D0' : '#FCA5A5';
+
+  const settings = DB.settings;
+  const budgetSec = document.getElementById('budget-section');
+  if(settings.budget>0) {
+    budgetSec.style.display='block';
+    const pct = Math.min(exp/settings.budget*100,100);
+    document.getElementById('budget-label').textContent = `予算使用率 ${Math.round(pct)}%（${fmt(settings.budget)}）`;
+    const fill = document.getElementById('budget-fill');
+    fill.style.width = pct+'%';
+    fill.style.background = pct>90?'#EF4444':pct>70?'#F59E0B':'#10B981';
+  } else {
+    budgetSec.style.display='none';
+  }
+
+  const list = document.getElementById('tx-list');
+  if(txs.length===0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">📝</div><div style="font-weight:600;margin-bottom:4px">取引がありません</div><div style="font-size:13px">＋ボタンから追加しましょう</div></div>`;
+    return;
+  }
+  const sorted = [...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  list.innerHTML = sorted.map(tx=>{
+    const cat = getCat(tx.category);
+    const isExp = tx.type==='expense';
+    return `<div class="tx-item">
+      <div class="tx-icon" style="background:${cat.color}22">${cat.icon}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${tx.desc}${tx.aiClassified?' ✨':''}</div>
+        <div class="tx-meta">${cat.id}　${fmtDate(tx.date)}</div>
+      </div>
+      <div class="tx-amount" style="color:${isExp?'#E74C3C':'#27AE60'}">${isExp?'-':'+'}${fmt(tx.amount)}</div>
+      <button class="tx-del" onclick="deleteTx('${tx.id}')" title="削除">×</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteTx(id) {
+  if(!confirm('この取引を削除しますか？')) return;
+  DB.txs = DB.txs.filter(t=>t.id!==id);
+  renderHome();
+  showToast('削除しました');
+}
+
+// ============================
+// 取引追加モーダル
+// ============================
+function openAdd() {
+  formType = 'expense';
+  formCat = 'その他';
+  document.getElementById('amount-input').value='';
+  document.getElementById('desc-input').value='';
+  document.getElementById('memo-input').value='';
+  document.getElementById('date-input').value=new Date().toISOString().split('T')[0];
+  document.getElementById('ai-classify-hint').textContent='';
+  document.getElementById('ai-classify-hint').className='ai-hint';
+  setType('expense');
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function handleModalBgClick(e) {
+  if(e.target===document.getElementById('add-modal')) closeAdd();
+}
+function closeAdd() { document.getElementById('add-modal').classList.remove('open') }
+
+function setType(t) {
+  formType=t;
+  document.getElementById('type-expense').className='type-btn'+(t==='expense'?' active-expense':'');
+  document.getElementById('type-income').className='type-btn'+(t==='income'?' active-income':'');
+  const defaultCat = t==='expense'?'その他':'給与';
+  formCat=defaultCat;
+  renderCatGrid();
+  updateSaveBtn();
+  // AI hint更新
+  const hasKey = !!DB.settings.apiKey;
+  const hintEl = document.getElementById('ai-classify-hint');
+  if(!hasKey){hintEl.textContent='🔒 設定でAPIキーを登録するとAI自動分類が使えます';hintEl.className='ai-hint'}
+  else{hintEl.textContent='';hintEl.className='ai-hint'}
+}
+
+function renderCatGrid() {
+  const cats = CATS[formType];
+  document.getElementById('cat-grid').innerHTML = cats.map(c=>`
+    <button class="cat-chip${formCat===c.id?' selected':''}"
+      style="${formCat===c.id?`background:${c.color};border-color:${c.color}`:''}"
+      onclick="selectCat('${c.id}')">
+      ${c.icon} ${c.id}
+    </button>`).join('');
+}
+
+function selectCat(id) { formCat=id; renderCatGrid() }
+
+function updateSaveBtn() {
+  const btn = document.getElementById('save-tx-btn');
+  btn.style.background = formType==='expense'?'linear-gradient(135deg,#EF4444,#DC2626)':'linear-gradient(135deg,#10B981,#059669)';
+}
+
+async function doAIClassify() {
+  const apiKey = DB.settings.apiKey;
+  if(!apiKey){showToast('設定でAPIキーを登録してください');return}
+  const desc = document.getElementById('desc-input').value.trim();
+  const amt = document.getElementById('amount-input').value;
+  if(!desc||!amt){showToast('内容と金額を入力してください');return}
+  const btn = document.getElementById('ai-classify-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+  const hintEl = document.getElementById('ai-classify-hint');
+  try {
+    const catList = CATS[formType].map(c=>c.id).join('、');
+    const prompt = `以下の取引を最も適切なカテゴリに分類してください。\n取引内容: ${desc}\n金額: ¥${amt}\n種別: ${formType==='expense'?'支出':'収入'}\n選択可能なカテゴリ: ${catList}\nカテゴリ名のみを回答してください。`;
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:20,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok) throw new Error('API error');
+    const data = await res.json();
+    const result = data.content[0]?.text?.trim();
+    const valid = CATS[formType].map(c=>c.id);
+    if(valid.includes(result)){
+      formCat=result; renderCatGrid();
+      hintEl.textContent='✨ AIがカテゴリを自動選択しました';
+      hintEl.className='ai-ok';
+    } else { hintEl.textContent='分類できませんでした。手動で選択してください。';hintEl.className='ai-hint' }
+  } catch(e) {
+    hintEl.textContent='エラーが発生しました。APIキーを確認してください。';hintEl.className='ai-hint';
+  } finally {
+    btn.disabled=false; btn.innerHTML='✨AI';
+  }
+}
+
+function saveTx() {
+  const amt = parseInt(document.getElementById('amount-input').value||'0');
+  const desc = document.getElementById('desc-input').value.trim();
+  if(amt<=0){showToast('金額を入力してください');return}
+  if(!desc){showToast('内容を入力してください');return}
+  const tx = {
+    id:genId(), type:formType, amount:amt, category:formCat,
+    desc, date:new Date(document.getElementById('date-input').value).toISOString(),
+    memo:document.getElementById('memo-input').value.trim(), aiClassified:false
+  };
+  DB.txs = [tx, ...DB.txs];
+  closeAdd();
+  renderHome();
+  showToast('保存しました！');
+}
+
+// ============================
+// AI分析
+// ============================
+function changeAnalysisMonth(d) {
+  analysisMonth+=d;
+  if(analysisMonth>12){analysisMonth=1;analysisYear++}
+  if(analysisMonth<1){analysisMonth=12;analysisYear--}
+  analysisResult=null;
+  renderAnalysis();
+}
+
+function renderAnalysis() {
+  document.getElementById('analysis-month-label').textContent=`${analysisYear}年${analysisMonth}月の分析`;
+  const hasKey = !!DB.settings.apiKey;
+  const headerEl = document.getElementById('analysis-header-content');
+  if(hasKey) {
+    headerEl.innerHTML=`<button class="analyze-btn" id="analyze-run-btn" onclick="runAnalysis()">✨ AIで分析する</button>`;
+  } else {
+    headerEl.innerHTML=`<div class="no-login-box"><p>🔒 設定でClaude APIキーを登録すると<br>AI分析・節約アドバイスが使えます</p><small>設定タブ → APIキーを入力</small></div>`;
+  }
+  const bodyEl = document.getElementById('analysis-body');
+  if(analysisResult) {
+    renderAnalysisResult(bodyEl, analysisResult);
+  } else {
+    bodyEl.innerHTML=`<div class="placeholder"><div class="placeholder-icon">${hasKey?'🤖':'📊'}</div><div class="placeholder-text">${hasKey?'「AIで分析する」を押すと\n今月の家計を分析します':'ホームで収支を記録して\n家計を管理しましょう'}</div></div>`;
+  }
+}
+
+async function runAnalysis() {
+  const apiKey = DB.settings.apiKey;
+  if(!apiKey){showToast('APIキーを設定してください');return}
+  const allTxs = DB.txs;
+  const txs = allTxs.filter(t=>{const d=new Date(t.date);return d.getFullYear()===analysisYear&&d.getMonth()+1===analysisMonth});
+  const btn = document.getElementById('analyze-run-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>分析中...';
+  try {
+    if(txs.length===0){
+      analysisResult={summary:'この月の取引データがありません。',advice:[],topCats:[],tips:[]};
+      renderAnalysis(); return;
+    }
+    const exps = txs.filter(t=>t.type==='expense');
+    const totalExp = exps.reduce((s,t)=>s+t.amount,0);
+    const totalInc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const byCat={};
+    exps.forEach(t=>{byCat[t.category]=(byCat[t.category]||0)+t.amount});
+    const catSummary=Object.entries(byCat).sort(([,a],[,b])=>b-a).map(([k,v])=>`${k}: ¥${v.toLocaleString()}`).join('\n');
+    const settings=DB.settings;
+    const prompt=`あなたは家計管理の専門家AIです。${analysisYear}年${analysisMonth}月の家計データを分析してわかりやすい日本語でアドバイスをください。\n\n収入合計: ¥${totalInc.toLocaleString()}\n支出合計: ¥${totalExp.toLocaleString()}\n収支差: ¥${(totalInc-totalExp).toLocaleString()}\n${settings.budget>0?`月次予算: ¥${Number(settings.budget).toLocaleString()}（使用率${Math.round(totalExp/settings.budget*100)}%）`:''}\n\nカテゴリ別支出:\n${catSummary}\n\n以下のJSON形式のみで回答してください:\n{"summary":"総評(2-3文)","advice":["ア1","ア2","ア3"],"tips":["コツ1","コツ2","コツ3"]}`;
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok) throw new Error('API error');
+    const data=await res.json();
+    const text=data.content[0]?.text?.trim()||'';
+    const match=text.match(/\{[\s\S]*\}/);
+    if(!match) throw new Error('parse error');
+    const parsed=JSON.parse(match[0]);
+    const topCats=Object.entries(byCat).sort(([,a],[,b])=>b-a).slice(0,5).map(([cat,amt])=>({cat,amt,pct:totalExp>0?Math.round(amt/totalExp*100):0}));
+    analysisResult={summary:parsed.summary||'',advice:parsed.advice||[],topCats,tips:parsed.tips||[]};
+    renderAnalysis();
+  } catch(e) {
+    showToast('分析に失敗しました。APIキーを確認してください。');
+    btn.disabled=false; btn.innerHTML='✨ AIで分析する';
+  }
+}
+
+function renderAnalysisResult(el, r) {
+  let html=`<div class="analysis-content">`;
+  if(r.summary) html+=`<div class="card"><div class="card-title">📊 今月の総評</div><div class="summary-text">${r.summary}</div></div>`;
+  if(r.topCats&&r.topCats.length>0){
+    html+=`<div class="card"><div class="card-title">💸 支出内訳 Top ${r.topCats.length}</div>`;
+    r.topCats.forEach((item,i)=>{
+      const cat=getCat(item.cat);
+      html+=`<div class="cat-bar-row">
+        <span class="rank">${i+1}</span>
+        <span style="font-size:18px;margin-right:6px">${cat.icon}</span>
+        <div class="cat-bar-info">
+          <div class="cat-bar-labels"><span class="cat-bar-name">${item.cat}</span><span class="cat-bar-amt">${fmt(item.amt)}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${item.pct}%;background:${CHART_COLORS[i%CHART_COLORS.length]}"></div></div>
+          <div class="cat-pct">${item.pct}%</div>
+        </div></div>`;
+    });
+    html+=`</div>`;
+  }
+  if(r.advice&&r.advice.length>0){
+    html+=`<div class="card"><div class="card-title">💡 アドバイス</div>`;
+    r.advice.forEach(a=>html+=`<div class="advice-item"><span class="advice-dot">・</span>${a}</div>`);
+    html+=`</div>`;
+  }
+  if(r.tips&&r.tips.length>0){
+    html+=`<div class="card" style="background:#F0FDF4"><div class="card-title">🎯 節約のコツ</div>`;
+    r.tips.forEach((tip,i)=>html+=`<div class="tip-item"><span class="tip-num">${i+1}</span><span class="tip-text">${tip}</span></div>`);
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+// ============================
+// 設定
+// ============================
+function renderSettings() {
+  const s = DB.settings;
+  const aiEl = document.getElementById('settings-ai-section');
+  // APIキー入力 UI
+  aiEl.innerHTML=`
+    <div class="field-label">Claude APIキー</div>
+    <div class="apikey-row">
+      <input class="apikey-input" id="apikey-input" type="password" placeholder="sk-ant-..." value="${s.apiKey||''}" autocomplete="off">
+      <button class="eye-btn" onclick="toggleApiKeyVisibility()">👁️</button>
+    </div>
+    <div class="hint-text">
+      <a href="https://console.anthropic.com" target="_blank" style="color:#4F46E5">console.anthropic.com</a> でAPIキーを発行できます。<br>
+      APIキーを登録するとAI自動分類・月次分析が使えます。<br>
+      登録しなくても家計簿として使えます。
+    </div>`;
+  if(s.budget>0) {
+    document.getElementById('budget-input').value=s.budget;
+    updateBudgetPreview();
+  }
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('apikey-input');
+  input.type = input.type==='password'?'text':'password';
+}
+
+function updateBudgetPreview() {
+  const v = parseInt(document.getElementById('budget-input').value||'0');
+  const el = document.getElementById('budget-preview');
+  if(v>0){el.style.display='block';el.textContent=`月の予算：${fmt(v)}`}
+  else{el.style.display='none'}
+}
+
+function saveSettings() {
+  const apiKey = (document.getElementById('apikey-input')?.value||'').trim();
+  const budget = parseInt(document.getElementById('budget-input').value||'0');
+  DB.settings = {...DB.settings, apiKey, budget};
+  const btn = document.getElementById('save-settings-btn');
+  btn.textContent='✓ 保存しました！';
+  btn.className='save-settings-btn saved';
+  setTimeout(()=>{btn.textContent='設定を保存';btn.className='save-settings-btn'},2000);
+  showToast('設定を保存しました');
+}
+
+function clearAllData() {
+  if(!confirm('すべての取引データを削除しますか？\nこの操作は取り消せません。')) return;
+  localStorage.removeItem('kakeibo_txs');
+  showToast('取引データを削除しました');
+  renderHome();
+}
+
+// ============================
+// 初期化
+// ============================
+renderHome();
+renderSettings();
+setType('expense');
+updateSaveBtn();
+document.getElementById('date-input').value=new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
